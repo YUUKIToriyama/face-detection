@@ -15,7 +15,7 @@ program
 	})
 	.action(parsed => {
 		const options: faceDetectOptions = {
-			dirName: __dirname,
+			dirName: process.cwd(),
 			fileName: parsed.args.file as string,
 			cascadeFileUrl: parsed.options.cascade as string,
 			bestEffort: parsed.options.bestEffort as boolean

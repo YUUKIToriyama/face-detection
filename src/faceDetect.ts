@@ -1,5 +1,6 @@
 import Jimp from 'jimp';
 import { cv } from 'opencv-wasm';
+import fs from 'fs';
 import getCascadeFile from './getCascadeFile';
 
 export interface faceDetectOptions {
@@ -9,27 +10,45 @@ export interface faceDetectOptions {
 	bestEffort: boolean
 }
 const faceDetect = (options: faceDetectOptions) => {
-	getCascadeFile(options.cascadeFileUrl).then(cascadeFileName => {
+	getCascadeFile(options.cascadeFileUrl).then(cascadeFilePath => {
 		// カスケードファイルをWebからダウンロード後、OpenCV.jsに読み込み
 		let faceCascade = new cv.CascadeClassifier();
-		faceCascade.load(cascadeFileName);
+		cv.FS_createDataFile(
+			"/",
+			"cascade.xml",
+			fs.readFileSync(process.cwd() + "/" + "haarcascade_frontalcatface.xml"),
+			true,
+			false,
+			false
+		)
+		if (faceCascade.load("cascade.xml")) {
+			console.log("success");
+		} else {
+			console.log(cascadeFilePath);
+			console.error("failed to load cascade file");
+		}
 		// 処理する画像を読み込み、処理をスタート
 		Jimp.read(options.dirName + '/' + options.fileName).then(imageData => {
-			const srcImage = cv.matFromImageData(imageData);
+			const srcImage = cv.matFromImageData(imageData.bitmap);
 			// 顔を認識して切り出し保存する関数
 			const cropFace = (src: any) => {
 				let grayscaleImage = new cv.Mat();
 				cv.cvtColor(src, grayscaleImage, cv.COLOR_RGBA2GRAY, 0);
 				let faces = new cv.RectVector();
 				let msize = new cv.Size(0, 0);
-				faceCascade.detectMultiScale(grayscaleImage, faces, 1.1, 3, 0, msize, msize);
+				try {
+
+					faceCascade.detectMultiScale(grayscaleImage, faces, 1.1, 3, 0, msize, msize);
+				} catch (err) {
+					console.error(err);
+				}
 				for (let i = 0; i < faces.size(); i++) {
 					const face = faces.get(i);
 					const cropArea = new cv.Rect(face.x, face.y, face.x + face.width, face.y + face.height);
 					const dst = src.roi(cropArea);
 					const output = new Jimp({
-						outerWidth: dst.cols,
-						outerHeight: dst.rows,
+						width: dst.cols,
+						height: dst.rows,
 						data: Buffer.from(dst.data)
 					});
 					output.write(options.dirName + `/edited-${i}-` + options.fileName);
