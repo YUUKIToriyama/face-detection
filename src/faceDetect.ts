@@ -2,7 +2,7 @@ import Jimp from 'jimp';
 import { cv } from 'opencv-wasm';
 import getCascadeFile from './getCascadeFile';
 
-interface faceDetectOptions {
+export interface faceDetectOptions {
 	dirName: string
 	fileName: string
 	cascadeFileUrl: string
@@ -60,3 +60,4 @@ const faceDetect = (options: faceDetectOptions) => {
 		console.error(error);
 	})
 }
+export default faceDetect;

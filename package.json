@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/YUUKIToriyama/face-detection#readme",
   "dependencies": {
+    "@caporal/core": "^2.0.2",
     "jimp": "^0.16.1",
     "node-fetch": "^2.6.1",
     "opencv-wasm": "*"
