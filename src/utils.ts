@@ -1,5 +1,6 @@
 import { cv, cvTranslateError } from 'opencv-wasm';
 import fs from 'fs';
+import fetch from 'node-fetch';
 export const isFileExisted = (filename: string): boolean => {
 	try {
 		fs.statSync(filename);
@@ -9,23 +10,21 @@ export const isFileExisted = (filename: string): boolean => {
 	}
 }
 export const createFileFromUrl = (options: { path: string, url: string }, callback: Function) => {
-	let request = new XMLHttpRequest();
-	request.open('GET', options.url, true);
-	request.responseType = 'arraybuffer';
-	request.onload = function (ev) {
-		if (request.readyState === 4) {
-			if (request.status === 200) {
-				let data = new Uint8Array(request.response);
-				try {
-					cv.FS_createDataFile('/', options.path, data, true, false, false);
-				} catch (err) {
-					console.error(cvTranslateError(cv, err));
-				}
-				callback();
-			} else {
-				console.error('Failed to load ' + options.url + ' status: ' + request.status);
-			}
+	fetch(options.url, {
+		method: "GET"
+	}).then(response => {
+		if (response.status === 200) {
+			return response.arrayBuffer();
+		} else {
+			throw Error('Failed to load ' + options.url + ' status: ' + response.status);
 		}
-	};
-	request.send();
+	}).then(buffer => {
+		let data = new Uint8Array(buffer);
+		try {
+			cv.FS_createDataFile('/', options.path, data, true, false, false);
+			callback();
+		} catch (err) {
+			console.error(cvTranslateError(cv, err));
+		}
+	});
 };
