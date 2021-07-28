@@ -1,7 +1,7 @@
 import Jimp from 'jimp';
+import path from 'path';
 import { cv } from 'opencv-wasm';
-import fs from 'fs';
-import getCascadeFile from './getCascadeFile';
+import { createFileFromUrl } from './utils';
 
 export interface faceDetectOptions {
 	dirName: string
@@ -10,25 +10,22 @@ export interface faceDetectOptions {
 	bestEffort: boolean
 }
 const faceDetect = (options: faceDetectOptions) => {
-	getCascadeFile(options.cascadeFileUrl).then(cascadeFilePath => {
-		// カスケードファイルをWebからダウンロード後、OpenCV.jsに読み込み
-		let faceCascade = new cv.CascadeClassifier();
-		cv.FS_createDataFile(
-			"/",
-			"cascade.xml",
-			fs.readFileSync(process.cwd() + "/" + "haarcascade_frontalcatface.xml"),
-			true,
-			false,
-			false
-		)
-		if (faceCascade.load("cascade.xml")) {
-			console.log("success");
-		} else {
-			console.log(cascadeFilePath);
-			console.error("failed to load cascade file");
+	// カスケードファイルをWebからダウンロード後、OpenCV.jsに読み込み
+	let faceCascade = new cv.CascadeClassifier();
+	let filename = options.cascadeFileUrl.split("/").slice(-1)[0] || "cascade.xml";
+	createFileFromUrl({
+		path: filename,
+		url: options.cascadeFileUrl
+	}).then((file) => {
+		try {
+			faceCascade.load(file);
+		} catch (e) {
+			console.error(e);
 		}
+	}).then(() => {
 		// 処理する画像を読み込み、処理をスタート
-		Jimp.read(options.dirName + '/' + options.fileName).then(imageData => {
+		const imagePath = path.resolve(options.dirName, options.fileName);
+		Jimp.read(imagePath).then(imageData => {
 			const srcImage = cv.matFromImageData(imageData.bitmap);
 			// 顔を認識して切り出し保存する関数
 			const cropFace = (src: any) => {
@@ -37,10 +34,10 @@ const faceDetect = (options: faceDetectOptions) => {
 				let faces = new cv.RectVector();
 				let msize = new cv.Size(0, 0);
 				try {
-
 					faceCascade.detectMultiScale(grayscaleImage, faces, 1.1, 3, 0, msize, msize);
 				} catch (err) {
 					console.error(err);
+					console.log("hoge");
 				}
 				for (let i = 0; i < faces.size(); i++) {
 					const face = faces.get(i);
@@ -51,7 +48,7 @@ const faceDetect = (options: faceDetectOptions) => {
 						height: dst.rows,
 						data: Buffer.from(dst.data)
 					});
-					output.write(options.dirName + `/edited-${i}-` + options.fileName);
+					output.write(path.join(options.dirName, `edited-${i}-${options.fileName}`));
 					dst.delete();
 				}
 				grayscaleImage.delete();
@@ -65,7 +62,7 @@ const faceDetect = (options: faceDetectOptions) => {
 				[0, 40, 80, 120, 160, 200, 240, 280, 320].forEach(theta => {
 					let rotatedImage = new cv.Mat();
 					const rotationMat = cv.getRotationMatrix2D(center, theta, 1);
-					cv.warpAffine(srcImage, rotatedImage, rotatedImage, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+					cv.warpAffine(srcImage, rotatedImage, rotationMat, dsize, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
 					// 処理
 					cropFace(rotatedImage);
 					// 後処理
@@ -74,6 +71,7 @@ const faceDetect = (options: faceDetectOptions) => {
 				})
 			}
 			srcImage.delete();
+
 		})
 	}).catch(error => {
 		console.error(error);
